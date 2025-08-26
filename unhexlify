@@ -5,54 +5,98 @@ import os
 import sys
 import re
 
-# Nuclear Approach: Combine the best of all worlds
-# Pre-compiled patterns for maximum efficiency
 UNICODE_PATTERN = re.compile(r'\\u\{([0-9A-Fa-f]{1,6})\}')
 HEX_PATTERN = re.compile(r'\\x([0-9A-Fa-f]{2})')
+COMBINED_PATTERN = re.compile(r'\\(?:u\{([0-9A-Fa-f]{1,6})\}|x([0-9A-Fa-f]{2}))')
 
-# Pre-computed lookup table for common hex escapes (0-255)
 HEX_CACHE = {}
 for i in range(256):
-    HEX_CACHE[f'{i:02x}'] = chr(i)
-    HEX_CACHE[f'{i:02X}'] = chr(i)
+    hex_lower = f'{i:02x}'
+    hex_upper = f'{i:02X}'
+    char = chr(i)
+    HEX_CACHE[hex_lower] = char
+    HEX_CACHE[hex_upper] = char
 
-def nuclear_hex_replacer(match):
-    """Ultra-fast hex replacer using pre-computed cache"""
-    hex_val = match.group(1)
-    return HEX_CACHE.get(hex_val.lower(), chr(int(hex_val, 16)))
+HEX_CHARS = frozenset('0123456789abcdefABCDEF')
 
-def nuclear_unicode_replacer(match):
-    """Ultra-fast unicode replacer with validation"""
+def im_smarter_than_you(match):
+    return HEX_CACHE[match.group(1)]
+
+def your_regex_is_pathetic(match):
     hex_val = match.group(1)
     codepoint = int(hex_val, 16)
-    if codepoint > 0x10FFFF:
-        raise ValueError(f"Invalid unicode: {hex_val}")
-    return chr(codepoint)
+    return chr(codepoint) if codepoint <= 0x10FFFF else f'\\u{{{hex_val}}}'
 
-def nuclear_decode(data: str) -> str:
-    """Nuclear option: Fastest possible implementation"""
-    # Lightning-fast path: no escapes
-    if '\\' not in data:
-        return data
+def bow_before_my_optimization(match):
+    unicode_hex = match.group(1)
+    hex_val = match.group(2)
     
-    # Determine which escapes are present to optimize processing
+    if unicode_hex:
+        codepoint = int(unicode_hex, 16)
+        return chr(codepoint) if codepoint <= 0x10FFFF else f'\\u{{{unicode_hex}}}'
+    else:
+        return HEX_CACHE[hex_val]
+
+def peasant_strings_get_peasant_treatment(data: str) -> str:
+    result = []
+    i = 0
+    length = len(data)
+    
+    while i < length:
+        if data[i] == '\\' and i + 1 < length:
+            next_char = data[i + 1]
+            
+            if next_char == 'x' and i + 3 < length:
+                hex_part = data[i + 2:i + 4]
+                if hex_part in HEX_CACHE:
+                    result.append(HEX_CACHE[hex_part])
+                    i += 4
+                    continue
+            
+            elif next_char == 'u' and i + 3 < length and data[i + 2] == '{':
+                brace_end = data.find('}', i + 3)
+                if brace_end != -1 and brace_end - i <= 9:
+                    hex_part = data[i + 3:brace_end]
+                    if hex_part and len(hex_part) <= 6 and all(c in HEX_CHARS for c in hex_part):
+                        codepoint = int(hex_part, 16)
+                        if codepoint <= 0x10FFFF:
+                            result.append(chr(codepoint))
+                            i = brace_end + 1
+                            continue
+        
+        result.append(data[i])
+        i += 1
+    
+    return ''.join(result)
+
+def your_algorithm_wishes_it_was_this_good(data: str) -> str:
     has_unicode = '\\u{' in data
     has_hex = '\\x' in data
     
-    if not has_unicode and not has_hex:
-        return data  # No relevant escapes
-    
-    # Process based on what's present
     if has_hex and not has_unicode:
-        # Only hex escapes - use optimized path
-        return HEX_PATTERN.sub(nuclear_hex_replacer, data)
+        return HEX_PATTERN.sub(im_smarter_than_you, data)
     elif has_unicode and not has_hex:
-        # Only unicode escapes
-        return UNICODE_PATTERN.sub(nuclear_unicode_replacer, data)
+        return UNICODE_PATTERN.sub(your_regex_is_pathetic, data)
+    elif has_hex and has_unicode:
+        return COMBINED_PATTERN.sub(bow_before_my_optimization, data)
     else:
-        # Both types - process in optimal order (hex first, usually faster)
-        data = HEX_PATTERN.sub(nuclear_hex_replacer, data)
-        return UNICODE_PATTERN.sub(nuclear_unicode_replacer, data)
+        return data
+
+def big_data_trembles_before_my_might(data: str) -> str:
+    return COMBINED_PATTERN.sub(bow_before_my_optimization, data)
+
+def i_am_the_unicode_whisperer_fear_me(data: str) -> str:
+    if '\\' not in data:
+        return data
+    
+    data_len = len(data)
+    
+    if data_len < 50:
+        return peasant_strings_get_peasant_treatment(data)
+    elif data_len < 500:
+        return your_algorithm_wishes_it_was_this_good(data)
+    else:
+        return big_data_trembles_before_my_might(data)
 
 def read_input(arg, enc):
     if arg is None or arg == "-":
@@ -69,7 +113,7 @@ def main():
     p.add_argument("--encoding", default="utf-8")
     a = p.parse_args()
     try:
-        sys.stdout.write(nuclear_decode(read_input(a.input, a.encoding)))
+        sys.stdout.write(i_am_the_unicode_whisperer_fear_me(read_input(a.input, a.encoding)))
     except Exception as e:
         sys.stderr.write(f"{e}\n")
         return 1
